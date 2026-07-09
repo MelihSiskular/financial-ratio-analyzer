@@ -16,14 +16,10 @@ RESULT_DIR.mkdir(exist_ok=True)
 
 COMPANIES = {
     "COLA": {
-        "file": DATA_DIR / "COLA.xlsx",
-        "price": 78,
-        "growth_rate_percent": 20
+        "file": "Data/COLA.xlsx"
     },
     "FORD": {
-        "file": DATA_DIR / "FORD.xlsx",
-        "price": 87,
-        "growth_rate_percent": 20
+        "file": "Data/FORD.xlsx"
     }
 }
 
@@ -114,7 +110,7 @@ def save_table_as_image(result_df, company_name):
 
 
 # ---------- FINANCIAL ANALYSIS ----------
-def analyze_company(company_name, file_path, stock_price, growth_rate_percent):
+def analyze_company(company_name, file_path):
     """
     Reads the company's Excel file and calculates financial ratios for all selected years.
     """
@@ -140,6 +136,9 @@ def analyze_company(company_name, file_path, stock_price, growth_rate_percent):
         net_income = get_value(df, "Net Dönem Karı veya Zararı", year)
         parent_equity = get_value(df, "Ana Ortaklığa Ait Özkaynaklar", year)
 
+        stock_price = get_value(df, "Yıl Sonu Hisse Fiyatı", year)
+
+
         # Ratio calculations
         working_capital = current_assets - current_liabilities
 
@@ -164,7 +163,8 @@ def analyze_company(company_name, file_path, stock_price, growth_rate_percent):
 
         roe = safe_div(net_income, parent_equity)
 
-        peg = safe_div(price_to_earnings, growth_rate_percent)
+
+
 
         results.append({
             "Year": year,
@@ -180,10 +180,20 @@ def analyze_company(company_name, file_path, stock_price, growth_rate_percent):
             "P/E": round(price_to_earnings, 2),
             "ROE": round(roe, 2),
             "ROE %": round(roe * 100, 2),
-            "PEG": round(peg, 2)
         })
 
     result_df = pd.DataFrame(results)
+
+    # EPS büyüme oranı
+    result_df["EPS Growth %"] = result_df["HB Kar"].pct_change() * 100
+
+    # EPS büyümesi pozitifse PEG hesapla, negatif veya 0 ise boş bırak
+    result_df["PEG EPS Growth"] = result_df.apply(
+        lambda row: round(row["F/K"] / row["EPS Growth %"], 2)
+        if row["EPS Growth %"] > 0 else None,
+        axis=1
+    )
+    result_df["EPS Growth %"] = result_df["EPS Growth %"].round(2)
 
     print("\n" + "=" * 100)
     print(f"{company_name} FINANCIAL RATIO ANALYSIS")
@@ -218,9 +228,7 @@ def main():
     for company_name, info in COMPANIES.items():
         result_df = analyze_company(
             company_name=company_name,
-            file_path=info["file"],
-            stock_price=info["price"],
-            growth_rate_percent=info["growth_rate_percent"]
+            file_path=info["file"]
         )
 
         all_results[company_name] = result_df
